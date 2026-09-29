@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GENITUS MACRO / YIELD-CURVE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root{--bg:#f4f7fb;--surface:#ffffff;--panel:#ffffff;--border:#d9e2ec;--accent:#0e7490;--gold:#b45309;--green:#15803d;--red:#b91c1c;--muted:#52606d;--text:#1e293b;--bright:#0f172a;--mono:'Space Mono',monospace;--sans:'Rajdhani',sans-serif;}
+    :root.dark-theme{--bg:#080c10;--surface:#0d1117;--panel:#111820;--border:#1e2d3d;--accent:#00d4ff;--gold:#f0c040;--green:#00ff88;--red:#ff3b5c;--muted:#7d92a8;--text:#c8d8e8;--bright:#ffffff;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;min-height:100vh;transition:background .25s,color .25s;}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;}
+    .logo{display:flex;align-items:center;gap:12px;}
+    .logo-mark{width:32px;height:32px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;color:var(--accent);}
+    .logo-text{font-family:var(--mono);font-size:13px;letter-spacing:3px;color:var(--bright);}
+    .logo-sub{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);display:block;margin-top:1px;}
+    #themeToggleBtn{background:none;border:1px solid var(--border);color:var(--accent);width:30px;height:30px;border-radius:2px;cursor:pointer;font-size:14px;}
+    .live-badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px;text-transform:uppercase;}
+    .main{max-width:1200px;margin:0 auto;padding:20px;}
+    .panel-block{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:16px;margin-bottom:18px;}
+    .panel-block h3{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:12px;}
+    .panel-block p.note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;}
+    .chart-wrap{height:340px;position:relative;}
+    .chart-wrap.small{height:220px;}
+    .spread-hero{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+    .spread-box{text-align:center;min-width:140px;}
+    .spread-val{font-family:var(--mono);font-size:34px;font-weight:700;}
+    .spread-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+    .status-pill{display:inline-block;padding:4px 12px;border-radius:12px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;margin-top:6px;}
+    .status-green{background:rgba(21,128,61,0.15);color:var(--green);}
+    .status-red{background:rgba(185,28,28,0.15);color:var(--red);}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);}
+    th:first-child,th:nth-child(2){text-align:left;}
+    td{padding:7px 10px;border-bottom:1px solid rgba(125,146,168,0.15);text-align:right;font-family:var(--mono);font-size:12px;}
+    td:first-child{font-weight:700;color:var(--accent);text-align:left;}
+    td:nth-child(2){text-align:left;font-family:var(--sans);color:var(--muted);}
+    .chg-pos{color:var(--green);} .chg-neg{color:var(--red);}
+    .loading-line{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;padding:40px;}
+    .disclaimer{font-size:10px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border);padding-top:10px;margin-top:6px;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-mark">Y</div><div><span class="logo-text">GENITUS</span><span class="logo-sub">MACRO / YIELD-CURVE</span></div></div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="live-badge" id="liveBadge">● lädt live...</span><button id="themeToggleBtn" title="Toggle theme">🌙</button></div>
+</header>
+<div class="main" id="mainPanel">
+  <div class="loading-line">Lade Treasury-Yields und Bond-ETF-Daten live von Yahoo Finance...</div>
+</div>
+<script>
+  const YF_QUOTE = 'https://stock-sentinel-domusaureaopn.replit.app/api/yahoo/quote';
+  const YF_CHART = 'https://stock-sentinel-domusaureaopn.replit.app/api/yahoo/chart';
+
+  (function(){
+    const KEY='genitusTheme:macroyield';
+    function applyTheme(t){ document.documentElement.classList.toggle('dark-theme', t==='dark'); localStorage.setItem(KEY,t); const btn=document.getElementById('themeToggleBtn'); if(btn) btn.textContent = t==='dark' ? '☀' : '🌙'; }
+    window.__theme = localStorage.getItem(KEY) || 'light';
+    applyTheme(window.__theme);
+    document.addEventListener('DOMContentLoaded', function(){ const btn=document.getElementById('themeToggleBtn'); if(btn) btn.addEventListener('click', function(){ window.__theme = window.__theme==='dark' ? 'light' : 'dark'; applyTheme(window.__theme); }); });
+  })();
+
+  const TREASURY = [
+    {sym:'^IRX', label:'3M', months:3},
+    {sym:'^FVX', label:'5Y', months:60},
+    {sym:'^TNX', label:'10Y', months:120},
+    {sym:'^TYX', label:'30Y', months:360},
+  ];
+  const BOND_ETFS = [
+    {sym:'SHY', category:'Treasury 1-3Y'},
+    {sym:'IEI', category:'Treasury 3-7Y'},
+    {sym:'IEF', category:'Treasury 7-10Y'},
+    {sym:'TLT', category:'Treasury 20+Y'},
+    {sym:'BND', category:'Aggregate (Total Market)'},
+    {sym:'AGG', category:'Aggregate (Core US)'},
+    {sym:'LQD', category:'Investment Grade Corporate'},
+    {sym:'HYG', category:'High Yield Corporate ("Junk")'},
+    {sym:'TIP', category:'TIPS (Inflationsschutz)'},
+    {sym:'MUB', category:'Municipal (steuerbefreit US)'},
+  ];
+
+  async function fetchQuote(sym){
+    const res = await fetch(`${YF_QUOTE}/${encodeURIComponent(sym)}?modules=price,summaryDetail`);
+    if(!res.ok) return null;
+    const j = await res.json();
+    return j?.quoteSummary?.result?.[0] || null;
+  }
+  async function fetchChartCloses(sym, days){
+    const res = await fetch(`${YF_CHART}/${encodeURIComponent(sym)}?period_days=${days}`);
+    if(!res.ok) return null;
+    const j = await res.json();
+    const result = j?.chart?.result?.[0];
+    if(!result) return null;
+    const ts = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    return ts.map((t,i)=>({t, close: closes[i]})).filter(p=>p.close!=null && isFinite(p.close));
+  }
+  function valueAtDaysAgo(points, daysAgo){
+    if(!points || !points.length) return null;
+    const targetTs = Date.now()/1000 - daysAgo*86400;
+    let best = points[0], bestDiff = Math.abs(points[0].t - targetTs);
+    for(const p of points){ const diff = Math.abs(p.t - targetTs); if(diff < bestDiff){ bestDiff = diff; best = p; } }
+    return best.close;
+  }
+
+  function fmtPct(n,d=2){ return n==null?'—':n.toFixed(d)+'%'; }
+  function fmtNum(n,d=2){ return n==null?'—':n.toFixed(d); }
+
+  let curveChart=null, spreadChart=null;
+
+  async function loadAll(){
+    try{
+      // Treasury: fetch 400-day chart for each maturity, extract today / -30d / -365d
+      const treasuryData = await Promise.all(TREASURY.map(async t=>{
+        const points = await fetchChartCloses(t.sym, 400);
+        return {
+          ...t,
+          today: valueAtDaysAgo(points, 0),
+          m1: valueAtDaysAgo(points, 30),
+          y1: valueAtDaysAgo(points, 365),
+          series: points,
+        };
+      }));
+
+      // Bond ETFs: quote each
+      const etfData = await Promise.all(BOND_ETFS.map(async e=>{
+        const q = await fetchQuote(e.sym);
+        const price = q?.price, sd = q?.summaryDetail;
+        return {
+          ...e,
+          name: price?.longName?.raw || price?.shortName?.raw || e.sym,
+          last: price?.regularMarketPrice?.raw ?? null,
+          changePct: price?.regularMarketChangePercent?.raw ?? null,
+          yield: sd?.dividendYield?.raw ?? null,
+          w52hi: sd?.fiftyTwoWeekHigh?.raw ?? null,
+          w52lo: sd?.fiftyTwoWeekLow?.raw ?? null,
+        };
+      }));
+
+      render(treasuryData, etfData);
+      document.getElementById('liveBadge').textContent = '● live · ' + new Date().toLocaleString('de-DE');
+    }catch(e){
+      document.getElementById('mainPanel').innerHTML = `<div class="loading-line">Fehler beim Laden: ${e.message}</div>`;
+      document.getElementById('liveBadge').textContent = '● Fehler';
+    }
+  }
+
+  function render(treasuryData, etfData){
+    const t10 = treasuryData.find(t=>t.label==='10Y');
+    const t3m = treasuryData.find(t=>t.label==='3M');
+    const spreadToday = (t10.today!=null && t3m.today!=null) ? t10.today - t3m.today : null;
+    const spreadInverted = spreadToday!=null && spreadToday < 0;
+
+    const panel = document.getElementById('mainPanel');
+    panel.innerHTML = `
+      <div class="panel-block">
+        <h3>US-Treasury-Zinskurve</h3>
+        <div class="chart-wrap"><canvas id="curveChart"></canvas></div>
+        <p class="note">Vergleich: heute vs. vor 1 Monat vs. vor 1 Jahr. Fällt die Kurve links höher als rechts, ist sie invertiert — historisch ein Rezessionssignal.</p>
+      </div>
+
+      <div class="panel-block">
+        <h3>3M10Y-Spread (klassischer Rezessionsindikator)</h3>
+        <div class="spread-hero">
+          <div class="spread-box">
+            <div class="spread-val" style="color:${spreadInverted?'var(--red)':'var(--green)'}">${spreadToday!=null ? (spreadToday>=0?'+':'')+spreadToday.toFixed(2)+'pp' : '—'}</div>
+            <div class="spread-lbl">10Y minus 3M</div>
+            <div class="status-pill ${spreadInverted?'status-red':'status-green'}">${spreadInverted?'Invertiert':'Normal'}</div>
+          </div>
+          <div style="flex:1;min-width:260px" class="chart-wrap small"><canvas id="spreadChart"></canvas></div>
+        </div>
+        <p class="note">Eine negative 10Y-3M-Spanne (kurzfristige Zinsen höher als langfristige) ging historisch fast jeder US-Rezession seit 1970 voraus — mit 6-24 Monaten Vorlauf. Kein Timing-Signal, sondern ein grober Frühindikator.</p>
+      </div>
+
+      <div class="panel-block">
+        <h3>Treasury-Yields im Detail</h3>
+        <table>
+          <thead><tr><th>Laufzeit</th><th>Ticker</th><th>Heute</th><th>vor 1M</th><th>vor 1J</th><th>Δ 1M</th><th>Δ 1J</th></tr></thead>
+          <tbody>
+            ${treasuryData.map(t=>{
+              const d1m = (t.today!=null && t.m1!=null) ? t.today-t.m1 : null;
+              const d1y = (t.today!=null && t.y1!=null) ? t.today-t.y1 : null;
+              return `<tr><td>${t.label}</td><td>${t.sym}</td><td>${fmtPct(t.today)}</td><td>${fmtPct(t.m1)}</td><td>${fmtPct(t.y1)}</td>
+                <td class="${d1m>0?'chg-pos':d1m<0?'chg-neg':''}">${d1m!=null?(d1m>=0?'+':'')+d1m.toFixed(2)+'pp':'—'}</td>
+                <td class="${d1y>0?'chg-pos':d1y<0?'chg-neg':''}">${d1y!=null?(d1y>=0?'+':'')+d1y.toFixed(2)+'pp':'—'}</td></tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-block">
+        <h3>Bond-ETF-Übersicht</h3>
+        <table>
+          <thead><tr><th>Ticker</th><th>Kategorie</th><th>Kurs</th><th>Δ heute</th><th>Yield</th><th>52W Hoch</th><th>52W Tief</th></tr></thead>
+          <tbody>
+            ${etfData.map(e=>`<tr><td>${e.sym}</td><td>${e.category}</td><td>${fmtNum(e.last)}</td>
+              <td class="${e.changePct>0?'chg-pos':e.changePct<0?'chg-neg':''}">${e.changePct!=null?(e.changePct>=0?'+':'')+e.changePct.toFixed(2)+'%':'—'}</td>
+              <td>${fmtPct(e.yield)}</td><td>${fmtNum(e.w52hi)}</td><td>${fmtNum(e.w52lo)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-block">
+        <h3>Credit-Spread (Risikoappetit-Gauge)</h3>
+        ${renderCreditSpread(etfData)}
+        <div class="disclaimer">Alle Daten live von Yahoo Finance (Treasury-Indizes ^IRX/^FVX/^TNX/^TYX + Bond-ETF-Quotes), kein Cache. Treasury-ETFs sind keine Einzelanleihen — Duration-Buckets als Näherung. Makro-Übersicht, keine Anlageberatung, kein Rezessions-Timing-Signal.</div>
+      </div>
+    `;
+
+    // Yield curve chart: 3 lines (today, -1M, -1Y) across 4 maturities
+    const ctx1 = document.getElementById('curveChart').getContext('2d');
+    if(curveChart) curveChart.destroy();
+    curveChart = new Chart(ctx1, {
+      type:'line',
+      data:{
+        labels: treasuryData.map(t=>t.label),
+        datasets:[
+          { label:'Heute', data: treasuryData.map(t=>t.today), borderColor:'#0e7490', backgroundColor:'rgba(14,116,144,0.15)', tension:0.3, borderWidth:3 },
+          { label:'vor 1 Monat', data: treasuryData.map(t=>t.m1), borderColor:'#b45309', borderDash:[6,4], tension:0.3, borderWidth:2 },
+          { label:'vor 1 Jahr', data: treasuryData.map(t=>t.y1), borderColor:'#7d92a8', borderDash:[2,3], tension:0.3, borderWidth:2 },
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ ticks:{ color:'#7d92a8', callback:v=>v+'%' }, grid:{ color:'rgba(125,146,168,0.15)' } }, x:{ ticks:{ color:'#7d92a8' }, grid:{ display:false } } },
+        plugins:{ legend:{ labels:{ color:'#7d92a8' } } }
+      }
+    });
+
+    // Spread history chart: TNX - IRX over the joint time series
+    const t10series = t10.series||[], t3mseries = t3m.series||[];
+    const spreadSeries = t10series.map(p=>{
+      const match = t3mseries.reduce((best,q)=> Math.abs(q.t-p.t) < Math.abs(best.t-p.t) ? q : best, t3mseries[0]);
+      return { t: p.t, spread: match ? p.close - match.close : null };
+    }).filter(p=>p.spread!=null);
+    const ctx2 = document.getElementById('spreadChart').getContext('2d');
+    if(spreadChart) spreadChart.destroy();
+    spreadChart = new Chart(ctx2, {
+      type:'line',
+      data:{
+        labels: spreadSeries.map(p=>new Date(p.t*1000).toLocaleDateString('de-DE',{month:'short',day:'numeric'})),
+        datasets:[{ label:'10Y-3M Spread', data: spreadSeries.map(p=>p.spread), borderColor:'#0e7490', backgroundColor:'rgba(14,116,144,0.1)', fill:true, tension:0.2, pointRadius:0, borderWidth:2 }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ ticks:{ color:'#7d92a8', callback:v=>v+'pp' }, grid:{ color:'rgba(125,146,168,0.15)' } }, x:{ ticks:{ color:'#7d92a8', maxTicksLimit:8 }, grid:{ display:false } } },
+        plugins:{ legend:{ display:false } }
+      }
+    });
+  }
+
+  function renderCreditSpread(etfData){
+    const hyg = etfData.find(e=>e.sym==='HYG');
+    const lqd = etfData.find(e=>e.sym==='LQD');
+    const ief = etfData.find(e=>e.sym==='IEF');
+    if(!hyg?.yield || !lqd?.yield || !ief?.yield) return '<p class="note">Nicht genug Daten für Credit-Spread.</p>';
+    const junkSpread = hyg.yield - lqd.yield;
+    const igSpread = lqd.yield - ief.yield;
+    return `
+      <div class="ratio-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+        <div class="ratio-box" style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:10px 14px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase">High-Yield-Spread (HYG − LQD)</div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${junkSpread>3?'var(--red)':'var(--green)'}">${junkSpread>=0?'+':''}${junkSpread.toFixed(2)}pp</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Je größer, desto mehr Risikoaufschlag verlangt der Markt für Junk-Bonds — steigt typischerweise vor/in Rezessionen.</div>
+        </div>
+        <div class="ratio-box" style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:10px 14px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase">IG-Spread (LQD − 7-10Y Treasury)</div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${igSpread>1.5?'var(--gold)':'var(--green)'}">${igSpread>=0?'+':''}${igSpread.toFixed(2)}pp</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Aufschlag von Investment-Grade-Unternehmensanleihen über risikofreiem Treasury-Zins.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  loadAll();
+</script>
+</body>
+</html>
