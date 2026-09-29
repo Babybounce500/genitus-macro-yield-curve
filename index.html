@@ -203,9 +203,14 @@
       </div>
 
       <div class="panel-block">
+        <h3>Inflationserwartung (Breakeven-Proxy)</h3>
+        ${renderBreakeven(treasuryData, etfData)}
+      </div>
+
+      <div class="panel-block">
         <h3>Credit-Spread (Risikoappetit-Gauge)</h3>
         ${renderCreditSpread(etfData)}
-        <div class="disclaimer">Alle Daten live von Yahoo Finance (Treasury-Indizes ^IRX/^FVX/^TNX/^TYX + Bond-ETF-Quotes), kein Cache. Treasury-ETFs sind keine Einzelanleihen — Duration-Buckets als Näherung. Makro-Übersicht, keine Anlageberatung, kein Rezessions-Timing-Signal.</div>
+        <div class="disclaimer">Alle Daten live von Yahoo Finance (Treasury-Indizes ^IRX/^FVX/^TNX/^TYX + Bond-ETF-Quotes), kein Cache. Treasury-ETFs sind keine Einzelanleihen — Duration-Buckets als Näherung. Breakeven-Inflation ist eine ETF-Yield-Näherung, nicht die offizielle FRED-Realzins-Kurve. Makro-Übersicht, keine Anlageberatung, kein Rezessions-Timing-Signal.</div>
       </div>
     `;
 
@@ -247,6 +252,23 @@
         plugins:{ legend:{ display:false } }
       }
     });
+  }
+
+  function renderBreakeven(treasuryData, etfData){
+    const t10 = treasuryData.find(t=>t.label==='10Y');
+    const tip = etfData.find(e=>e.sym==='TIP');
+    if(!t10?.today || !tip?.yield) return '<p class="note">Nicht genug Daten für Breakeven-Proxy.</p>';
+    const breakeven = t10.today - tip.yield;
+    const hot = breakeven > 2.5;
+    return `
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div class="spread-box">
+          <div class="spread-val" style="color:${hot?'var(--gold)':'var(--accent)'}">${breakeven>=0?'+':''}${breakeven.toFixed(2)}pp</div>
+          <div class="spread-lbl">10Y nominal − TIP-Yield</div>
+        </div>
+        <p class="note" style="margin:0;flex:1;min-width:260px;">Grobe Näherung für die vom Markt eingepreiste Inflationserwartung: nominale 10Y-Treasury-Rendite (^TNX) minus TIP-ETF-Yield (TIPS = inflationsgeschützte Anleihen). Die offizielle FRED-Breakeven-Kurve nutzt echte TIPS-Realzinsen, nicht ETF-Dividendenrenditen — hier nur als Richtungsindikator, nicht als exakter Wert.</p>
+      </div>
+    `;
   }
 
   function renderCreditSpread(etfData){
