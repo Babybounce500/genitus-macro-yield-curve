@@ -80,6 +80,14 @@
     {sym:'TIP', category:'TIPS (Inflationsschutz)'},
     {sym:'MUB', category:'Municipal (steuerbefreit US)'},
   ];
+  const FX_PAIRS = [
+    {sym:'EURUSD=X', label:'EUR/USD'}, {sym:'GBPUSD=X', label:'GBP/USD'}, {sym:'USDJPY=X', label:'USD/JPY'},
+    {sym:'USDCHF=X', label:'USD/CHF'}, {sym:'USDCNY=X', label:'USD/CNY'}, {sym:'AUDUSD=X', label:'AUD/USD'},
+  ];
+  const COMMODITIES = [
+    {sym:'GC=F', label:'Gold', unit:'$/oz'}, {sym:'SI=F', label:'Silber', unit:'$/oz'}, {sym:'CL=F', label:'WTI-Öl', unit:'$/barrel'},
+    {sym:'NG=F', label:'Erdgas', unit:'$/MMBtu'}, {sym:'HG=F', label:'Kupfer', unit:'$/lb'},
+  ];
 
   async function fetchQuote(sym){
     const res = await fetch(`${YF_QUOTE}/${encodeURIComponent(sym)}?modules=price,summaryDetail`);
@@ -139,7 +147,18 @@
         };
       }));
 
-      render(treasuryData, etfData);
+      const fxData = await Promise.all(FX_PAIRS.map(async f=>{
+        const q = await fetchQuote(f.sym);
+        const price = q?.price;
+        return { ...f, last: price?.regularMarketPrice?.raw ?? null, changePct: price?.regularMarketChangePercent?.raw ?? null };
+      }));
+      const commodityData = await Promise.all(COMMODITIES.map(async c=>{
+        const q = await fetchQuote(c.sym);
+        const price = q?.price, sd = q?.summaryDetail;
+        return { ...c, last: price?.regularMarketPrice?.raw ?? null, changePct: price?.regularMarketChangePercent?.raw ?? null, w52hi: sd?.fiftyTwoWeekHigh?.raw ?? null, w52lo: sd?.fiftyTwoWeekLow?.raw ?? null };
+      }));
+
+      render(treasuryData, etfData, fxData, commodityData);
       document.getElementById('liveBadge').textContent = '● live · ' + new Date().toLocaleString('de-DE');
     }catch(e){
       document.getElementById('mainPanel').innerHTML = `<div class="loading-line">Fehler beim Laden: ${e.message}</div>`;
@@ -147,7 +166,7 @@
     }
   }
 
-  function render(treasuryData, etfData){
+  function render(treasuryData, etfData, fxData, commodityData){
     const t10 = treasuryData.find(t=>t.label==='10Y');
     const t3m = treasuryData.find(t=>t.label==='3M');
     const spreadToday = (t10.today!=null && t3m.today!=null) ? t10.today - t3m.today : null;
@@ -198,6 +217,29 @@
             ${etfData.map(e=>`<tr><td>${e.sym}</td><td>${e.category}</td><td>${fmtNum(e.last)}</td>
               <td class="${e.changePct>0?'chg-pos':e.changePct<0?'chg-neg':''}">${e.changePct!=null?(e.changePct>=0?'+':'')+e.changePct.toFixed(2)+'%':'—'}</td>
               <td>${fmtPct(e.yield)}</td><td>${fmtNum(e.w52hi)}</td><td>${fmtNum(e.w52lo)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-block">
+        <h3>Devisen (FX)</h3>
+        <table>
+          <thead><tr><th>Paar</th><th></th><th>Kurs</th><th>Δ heute</th></tr></thead>
+          <tbody>
+            ${fxData.map(f=>`<tr><td>${f.label}</td><td>${f.sym}</td><td>${fmtNum(f.last,4)}</td>
+              <td class="${f.changePct>0?'chg-pos':f.changePct<0?'chg-neg':''}">${f.changePct!=null?(f.changePct>=0?'+':'')+f.changePct.toFixed(2)+'%':'—'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-block">
+        <h3>Rohstoffe</h3>
+        <table>
+          <thead><tr><th>Rohstoff</th><th>Einheit</th><th>Kurs</th><th>Δ heute</th><th>52W Hoch</th><th>52W Tief</th></tr></thead>
+          <tbody>
+            ${commodityData.map(c=>`<tr><td>${c.label}</td><td>${c.unit}</td><td>${fmtNum(c.last)}</td>
+              <td class="${c.changePct>0?'chg-pos':c.changePct<0?'chg-neg':''}">${c.changePct!=null?(c.changePct>=0?'+':'')+c.changePct.toFixed(2)+'%':'—'}</td>
+              <td>${fmtNum(c.w52hi)}</td><td>${fmtNum(c.w52lo)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
